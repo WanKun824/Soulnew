@@ -73,10 +73,10 @@ const VaporHeartPulse: React.FC = () => (
   </div>
 );
 
-/** Panel 2: 霓虹心电图 — scrolling EKG wave across dark screen */
+/** Panel 2: 霓虹心电图 — single EKG drawing line */
 const VaporEKG: React.FC = () => {
-  // EKG segment repeated twice for seamless scroll
-  const seg = "M0,50 L24,50 L34,50 L42,28 L50,65 L56,5 L63,88 L70,50 L82,50 L200,50";
+  // A single heartbeat centered in the 400x100 view
+  const singleBeat = "M 0,50 L 150,50 L 165,50 L 175,25 L 185,75 L 195,15 L 210,85 L 225,50 L 250,50 L 400,50";
   return (
     <div
       className="relative w-full h-52 md:h-60 rounded-3xl liquid-glass overflow-hidden flex items-center justify-center translate-z-0"
@@ -89,21 +89,26 @@ const VaporEKG: React.FC = () => {
       {/* Screen vignette */}
       <div className="absolute inset-0 pointer-events-none rounded-3xl shadow-[inset_0_0_60px_rgba(0,255,255,0.08)]" />
 
-      {/* Scrolling EKG */}
+      {/* Drawing EKG */}
       <svg viewBox="0 0 400 100" className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
-        {/* Trail (thick glow) - pure SVG stroke, no filter */}
+        {/* Static faint baseline */}
+        <path d="M 0,50 L 400,50" stroke="rgba(0,255,255,0.1)" strokeWidth="2" fill="none" />
+        
+        {/* Animated Drawing Path */}
         <motion.path
-          d={`${seg} M200,50 L224,50 L234,50 L242,28 L250,65 L256,5 L263,88 L270,50 L282,50 L400,50`}
-          stroke="rgba(0,255,255,0.3)" strokeWidth="6" fill="none" strokeLinecap="round"
-          animate={{ x: [-200, 200] }}
-          transition={{ duration: 2.8, repeat: Infinity, ease: 'linear' }}
+          d={singleBeat}
+          stroke="#00FFFF" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round"
+          initial={{ pathLength: 0, opacity: 0 }}
+          animate={{ pathLength: [0, 1], opacity: [0, 1, 1, 0] }}
+          transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut', repeatDelay: 0.5 }}
         />
-        {/* Main line */}
+        {/* Glow trail */}
         <motion.path
-          d={`${seg} M200,50 L224,50 L234,50 L242,28 L250,65 L256,5 L263,88 L270,50 L282,50 L400,50`}
-          stroke="#00FFFF" strokeWidth="2" fill="none" strokeLinecap="round"
-          animate={{ x: [-200, 200] }}
-          transition={{ duration: 2.8, repeat: Infinity, ease: 'linear' }}
+          d={singleBeat}
+          stroke="rgba(0,255,255,0.4)" strokeWidth="8" fill="none" strokeLinecap="round" strokeLinejoin="round"
+          initial={{ pathLength: 0, opacity: 0 }}
+          animate={{ pathLength: [0, 1], opacity: [0, 0.8, 0] }}
+          transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut', repeatDelay: 0.5 }}
         />
       </svg>
 
@@ -111,7 +116,7 @@ const VaporEKG: React.FC = () => {
       <motion.div
         className="absolute inset-0 rounded-3xl pointer-events-none shadow-[inset_0_0_30px_rgba(0,255,255,0.06)] border border-[rgba(0,255,255,0.2)]"
         animate={{ opacity: [1, 1, 1.0, 0.5, 1] }}
-        transition={{ duration: 2.8, repeat: Infinity, ease: 'linear', times: [0, 0.35, 0.4, 0.42, 0.45] }}
+        transition={{ duration: 2.7, repeat: Infinity, ease: 'linear', times: [0, 0.4, 0.45, 0.5, 0.55] }}
       />
     </div>
   );
