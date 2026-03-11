@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { WelcomeScreen } from './components/WelcomeScreen';
-import { QuizScreen } from './components/QuizScreen';
-import { ResultsScreen } from './components/ResultsScreen';
-import { LookupScreen } from './components/LookupScreen';
+
+// Lazily load heavier screens
+const QuizScreen = React.lazy(() => import('./components/QuizScreen').then(m => ({ default: m.QuizScreen })));
+const ResultsScreen = React.lazy(() => import('./components/ResultsScreen').then(m => ({ default: m.ResultsScreen })));
+const LookupScreen = React.lazy(() => import('./components/LookupScreen').then(m => ({ default: m.LookupScreen })));
+
 import { ToastContainer, useToast } from './components/Toast';
 import { AppStep, Question, UserDemographics, QuizAnswer, MatchProfile, Language } from './types';
 import { generateQuizQuestions, analyzeProfile, getProfileBySoulId, translateQuestions } from './services/geminiService';
@@ -207,8 +210,10 @@ export default function App() {
 
           {step === AppStep.LOOKUP && (
             <div className="min-h-screen flex items-center justify-center px-4 pt-20">
-              <LookupScreen onBack={() => setStep(AppStep.WELCOME)}
-                onProfileFound={p => { setProfile(p); setStep(AppStep.RESULTS); }} text={t.lookup} />
+              <React.Suspense fallback={<div className="text-white/50">Loading...</div>}>
+                <LookupScreen onBack={() => setStep(AppStep.WELCOME)}
+                  onProfileFound={p => { setProfile(p); setStep(AppStep.RESULTS); }} text={t.lookup} />
+              </React.Suspense>
             </div>
           )}
 
@@ -226,11 +231,15 @@ export default function App() {
           {step === AppStep.ANALYZING && <AnalyzingScreen language={language} />}
 
           {step === AppStep.QUIZ && questions.length > 0 && (
-            <QuizScreen questions={questions} language={language} onComplete={handleQuizComplete} text={t.quiz} />
+            <React.Suspense fallback={<div className="min-h-screen flex items-center justify-center text-white/50">Loading quiz...</div>}>
+              <QuizScreen questions={questions} language={language} onComplete={handleQuizComplete} text={t.quiz} />
+            </React.Suspense>
           )}
 
           {step === AppStep.RESULTS && profile && (
-            <ResultsScreen profile={profile} onRestart={handleRestart} text={t.results} />
+            <React.Suspense fallback={<div className="min-h-screen flex items-center justify-center text-white/50">Loading results...</div>}>
+              <ResultsScreen profile={profile} onRestart={handleRestart} text={t.results} />
+            </React.Suspense>
           )}
         </main>
       </div>
