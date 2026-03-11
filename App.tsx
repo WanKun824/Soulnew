@@ -177,11 +177,14 @@ export default function App() {
       {/* ── Global flowing background ── */}
       <div className="fixed inset-0 -z-10 bg-[#07070f] overflow-hidden pointer-events-none">
         <motion.div animate={{ scale: [1,1.35,1], x:[0,40,0], y:[0,-30,0] }} transition={{ duration: 22, repeat: Infinity, ease: 'easeInOut' }}
-          className="absolute -top-1/3 -left-1/4 w-[80vw] h-[80vw] bg-indigo-950/80 rounded-full blur-[120px]" />
+          className="absolute -top-[40vw] -left-[20vw] w-[120vw] h-[120vw] rounded-full"
+          style={{ background: 'radial-gradient(circle at center, rgba(30,27,75,0.8) 0%, rgba(30,27,75,0) 60%)' }} />
         <motion.div animate={{ scale: [1,1.2,1], x:[0,-35,0], y:[0,40,0] }} transition={{ duration: 28, repeat: Infinity, ease: 'easeInOut', delay: 5 }}
-          className="absolute -bottom-1/4 -right-1/4 w-[70vw] h-[70vw] bg-purple-950/70 rounded-full blur-[100px]" />
+          className="absolute -bottom-[30vw] -right-[20vw] w-[110vw] h-[110vw] rounded-full"
+          style={{ background: 'radial-gradient(circle at center, rgba(88,28,135,0.6) 0%, rgba(88,28,135,0) 60%)' }} />
         <motion.div animate={{ scale:[1,1.5,1], x:[0,20,0], y:[0,50,0] }} transition={{ duration: 19, repeat: Infinity, ease: 'easeInOut', delay: 9 }}
-          className="absolute top-1/2 left-1/3 w-[50vw] h-[50vw] bg-rose-950/30 rounded-full blur-[90px]" />
+          className="absolute top-[20%] left-[20%] w-[80vw] h-[80vw] rounded-full"
+          style={{ background: 'radial-gradient(circle at center, rgba(136,19,55,0.25) 0%, rgba(136,19,55,0) 50%)' }} />
       </div>
 
       <div className="flex flex-col font-sans text-white min-h-screen">

@@ -20,7 +20,7 @@ const HEART_PATH = "M12,21.35C5.4,15.36,2,12.28,2,8.5C2,5.42,4.42,3,7.5,3c1.74,0
 /** Panel 1: 霓虹心跳波纹 — neon heart pulse + ripple rings */
 const VaporHeartPulse: React.FC = () => (
   <div
-    className="relative w-full h-52 md:h-60 rounded-3xl liquid-glass overflow-hidden flex items-center justify-center"
+    className="relative w-full h-52 md:h-60 rounded-3xl liquid-glass overflow-hidden flex items-center justify-center translate-z-0"
     style={{ background: 'linear-gradient(135deg,#12002a,#200040,#0d0018)' }}
   >
     {/* CRT scanlines */}
@@ -39,8 +39,7 @@ const VaporHeartPulse: React.FC = () => (
     {/* Expanding ripple rings */}
     {[0, 1, 2].map(i => (
       <motion.div key={i}
-        className="absolute rounded-full"
-        style={{ border: '1.5px solid #FF1493', filter: 'drop-shadow(0 0 6px #FF1493)' }}
+        className="absolute rounded-full border border-[rgba(255,20,147,0.5)] shadow-[0_0_12px_rgba(255,20,147,0.4)]"
         initial={{ width: 40, height: 40, opacity: 0.85 }}
         animate={{ width: 200, height: 200, opacity: 0 }}
         transition={{ duration: 2.2, repeat: Infinity, delay: i * 0.72, ease: 'easeOut' }}
@@ -48,19 +47,26 @@ const VaporHeartPulse: React.FC = () => (
     ))}
 
     {/* Pulsing neon heart */}
-    <motion.svg
-      viewBox="0 0 24 24" className="relative z-10 w-16 h-16"
-      animate={{ scale: [1, 1.18, 1] }}
-      transition={{ duration: 0.65, repeat: Infinity, repeatDelay: 1.4, ease: 'easeInOut' }}
-      style={{ filter: 'drop-shadow(0 0 12px #FF1493) drop-shadow(0 0 28px #ff69b4)' }}
-    >
-      <path d={HEART_PATH} fill="#FF1493" />
-    </motion.svg>
+    <div className="relative z-10 w-16 h-16 flex items-center justify-center">
+      {/* Static glow element instead of animating SVG filter */}
+      <motion.div 
+        className="absolute inset-0 bg-[#FF1493] rounded-full blur-xl opacity-60"
+        animate={{ scale: [1, 1.2, 1] }}
+        transition={{ duration: 0.65, repeat: Infinity, repeatDelay: 1.4, ease: 'easeInOut' }}
+      />
+      <motion.svg
+        viewBox="0 0 24 24" className="absolute inset-0 w-full h-full drop-shadow-md"
+        animate={{ scale: [1, 1.18, 1] }}
+        transition={{ duration: 0.65, repeat: Infinity, repeatDelay: 1.4, ease: 'easeInOut' }}
+      >
+        <path d={HEART_PATH} fill="#FF1493" />
+      </motion.svg>
+    </div>
 
     {/* Blinking indicator dot (no text) */}
     <motion.div
-      className="absolute top-4 right-4 w-2 h-2 rounded-full"
-      style={{ background: '#FF1493', boxShadow: '0 0 8px #FF1493' }}
+      className="absolute top-4 right-4 w-2 h-2 rounded-full shadow-[0_0_8px_#FF1493]"
+      style={{ background: '#FF1493' }}
       animate={{ opacity: [1, 0.15, 1] }}
       transition={{ duration: 0.7, repeat: Infinity, repeatDelay: 1.5 }}
     />
@@ -73,7 +79,7 @@ const VaporEKG: React.FC = () => {
   const seg = "M0,50 L24,50 L34,50 L42,28 L50,65 L56,5 L63,88 L70,50 L82,50 L200,50";
   return (
     <div
-      className="relative w-full h-52 md:h-60 rounded-3xl liquid-glass overflow-hidden flex items-center justify-center"
+      className="relative w-full h-52 md:h-60 rounded-3xl liquid-glass overflow-hidden flex items-center justify-center translate-z-0"
       style={{ background: 'linear-gradient(135deg,#00101a,#001828,#000d14)' }}
     >
       {/* Scanlines */}
@@ -81,21 +87,14 @@ const VaporEKG: React.FC = () => {
         style={{ backgroundImage: 'repeating-linear-gradient(0deg,#00ffff 0,#00ffff 1px,transparent 1px,transparent 4px)', backgroundSize: '100% 4px' }} />
 
       {/* Screen vignette */}
-      <div className="absolute inset-0 pointer-events-none rounded-3xl"
-        style={{ boxShadow: 'inset 0 0 60px rgba(0,255,255,0.08)' }} />
+      <div className="absolute inset-0 pointer-events-none rounded-3xl shadow-[inset_0_0_60px_rgba(0,255,255,0.08)]" />
 
       {/* Scrolling EKG */}
       <svg viewBox="0 0 400 100" className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
-        <defs>
-          <filter id="glow-cyan">
-            <feGaussianBlur stdDeviation="2" result="blur" />
-            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-          </filter>
-        </defs>
-        {/* Trail (thick glow) */}
+        {/* Trail (thick glow) - pure SVG stroke, no filter */}
         <motion.path
           d={`${seg} M200,50 L224,50 L234,50 L242,28 L250,65 L256,5 L263,88 L270,50 L282,50 L400,50`}
-          stroke="rgba(0,255,255,0.18)" strokeWidth="8" fill="none" strokeLinecap="round"
+          stroke="rgba(0,255,255,0.3)" strokeWidth="6" fill="none" strokeLinecap="round"
           animate={{ x: [-200, 200] }}
           transition={{ duration: 2.8, repeat: Infinity, ease: 'linear' }}
         />
@@ -103,7 +102,6 @@ const VaporEKG: React.FC = () => {
         <motion.path
           d={`${seg} M200,50 L224,50 L234,50 L242,28 L250,65 L256,5 L263,88 L270,50 L282,50 L400,50`}
           stroke="#00FFFF" strokeWidth="2" fill="none" strokeLinecap="round"
-          filter="url(#glow-cyan)"
           animate={{ x: [-200, 200] }}
           transition={{ duration: 2.8, repeat: Infinity, ease: 'linear' }}
         />
@@ -111,8 +109,7 @@ const VaporEKG: React.FC = () => {
 
       {/* Flicker overlay on "peak" */}
       <motion.div
-        className="absolute inset-0 rounded-3xl pointer-events-none"
-        style={{ border: '1px solid rgba(0,255,255,0.3)', boxShadow: 'inset 0 0 30px rgba(0,255,255,0.06)' }}
+        className="absolute inset-0 rounded-3xl pointer-events-none shadow-[inset_0_0_30px_rgba(0,255,255,0.06)] border border-[rgba(0,255,255,0.2)]"
         animate={{ opacity: [1, 1, 1.0, 0.5, 1] }}
         transition={{ duration: 2.8, repeat: Infinity, ease: 'linear', times: [0, 0.35, 0.4, 0.42, 0.45] }}
       />
@@ -123,7 +120,7 @@ const VaporEKG: React.FC = () => {
 /** Panel 3: 双心汇合 — two hearts drift and merge with neon ripple */
 const VaporTwinMerge: React.FC = () => (
   <div
-    className="relative w-full h-52 md:h-60 rounded-3xl liquid-glass overflow-hidden flex items-center justify-center"
+    className="relative w-full h-52 md:h-60 rounded-3xl liquid-glass overflow-hidden flex items-center justify-center translate-z-0"
     style={{ background: 'linear-gradient(135deg,#1a0030,#280040,#0a0020)' }}
   >
     {/* Grid bg */}
@@ -137,32 +134,37 @@ const VaporTwinMerge: React.FC = () => (
     {/* Merge ripple — blooms when hearts "arrive" */}
     {[0, 1].map(i => (
       <motion.div key={i}
-        className="absolute rounded-full"
-        style={{ border: '1px solid rgba(255,255,255,0.6)', filter: 'drop-shadow(0 0 8px #ff69b4) drop-shadow(0 0 16px #00ffff)' }}
+        className="absolute rounded-full border border-[rgba(255,255,255,0.4)] shadow-[0_0_16px_rgba(255,105,180,0.5)]"
         animate={{ width: [0, 180], height: [0, 180], opacity: [0.8, 0] }}
         transition={{ duration: 2.4, repeat: Infinity, delay: i * 1.2, ease: 'easeOut', repeatDelay: 1.6 }}
       />
     ))}
 
-    {/* Left heart - neon pink - moves toward center then back */}
-    <motion.svg
-      viewBox="0 0 24 24" className="absolute w-14 h-14"
-      style={{ filter: 'drop-shadow(0 0 10px #FF1493) drop-shadow(0 0 20px #ff69b4)', left: '15%' }}
+    {/* Left heart container - animated horizontally */}
+    <motion.div
+      className="absolute flex items-center justify-center w-14 h-14"
+      style={{ left: '15%' }}
       animate={{ x: [0, 72, 0] }}
       transition={{ duration: 4, repeat: Infinity, ease: [0.25, 0.46, 0.45, 0.94], repeatDelay: 0.2 }}
     >
-      <path d={HEART_PATH} fill="none" stroke="#FF1493" strokeWidth="1.5" />
-    </motion.svg>
+      <div className="absolute inset-0 bg-[#FF1493] rounded-full blur-md opacity-40" />
+      <svg viewBox="0 0 24 24" className="absolute w-full h-full">
+        <path d={HEART_PATH} fill="none" stroke="#FF1493" strokeWidth="2.5" />
+      </svg>
+    </motion.div>
 
-    {/* Right heart - neon cyan - mirrors */}
-    <motion.svg
-      viewBox="0 0 24 24" className="absolute w-14 h-14"
-      style={{ filter: 'drop-shadow(0 0 10px #00FFFF) drop-shadow(0 0 20px #00ffff)', right: '15%' }}
+    {/* Right heart container - animated horizontally */}
+    <motion.div
+      className="absolute flex items-center justify-center w-14 h-14"
+      style={{ right: '15%' }}
       animate={{ x: [0, -72, 0] }}
       transition={{ duration: 4, repeat: Infinity, ease: [0.25, 0.46, 0.45, 0.94], repeatDelay: 0.2 }}
     >
-      <path d={HEART_PATH} fill="none" stroke="#00FFFF" strokeWidth="1.5" />
-    </motion.svg>
+      <div className="absolute inset-0 bg-[#00FFFF] rounded-full blur-md opacity-40" />
+      <svg viewBox="0 0 24 24" className="absolute w-full h-full">
+        <path d={HEART_PATH} fill="none" stroke="#00FFFF" strokeWidth="2.5" />
+      </svg>
+    </motion.div>
 
     {/* Spark particles at center */}
     {[0, 1, 2, 3, 4, 5].map(i => {
@@ -172,8 +174,7 @@ const VaporTwinMerge: React.FC = () => (
       const ty = Math.sin(rad) * 40;
       return (
         <motion.div key={i}
-          className="absolute w-1 h-1 rounded-full"
-          style={{ background: i % 2 === 0 ? '#FF1493' : '#00FFFF', boxShadow: i % 2 === 0 ? '0 0 6px #FF1493' : '0 0 6px #00FFFF' }}
+          className={`absolute w-1 h-1 rounded-full ${i % 2 === 0 ? 'bg-[#FF1493] shadow-[0_0_6px_#FF1493]' : 'bg-[#00FFFF] shadow-[0_0_6px_#00FFFF]'}`}
           animate={{ x: [0, tx, 0], y: [0, ty, 0], opacity: [0, 1, 0], scale: [0, 1.5, 0] }}
           transition={{ duration: 0.6, repeat: Infinity, delay: 2.0 + (i * 0.04), repeatDelay: 3.6 }}
         />
