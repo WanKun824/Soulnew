@@ -189,9 +189,11 @@ export default function App() {
                    : [0,0,0,0,0]);
               setCurrentUserScores(parsed);
             }
-          } else {
-            console.log('App: No demographics in DB or error', error);
-          }
+            } else {
+              console.log('App: No demographics in DB or error', error);
+              // Auto-prompt profile setup if missing
+              setShowSettingsModal(true);
+            }
         });
     }
   }, [sessionUser]);

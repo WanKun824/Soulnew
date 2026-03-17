@@ -29,8 +29,8 @@ export const getRecommendedSouls = async (limit: number = 10): Promise<SocialPro
     query_scores: profile.radar_scores,
     match_gender: profile.interested_in,
     my_gender: profile.gender,
-    min_age: Math.max(18, (profile.age || 25) - 10),
-    max_age: (profile.age || 25) + 10,
+    min_age: Math.max(18, (profile.age || 25) - 15),
+    max_age: (profile.age || 25) + 15,
     match_limit: limit
   });
 
