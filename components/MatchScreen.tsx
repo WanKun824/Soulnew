@@ -285,7 +285,7 @@ const SwipeCard: React.FC<CardProps> = ({ soul, currentUserScores, onSwipe, resT
           <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none">
              <Heart className="text-rose-500" size={120} />
           </div>
-          <div className="w-full h-full min-w-0">
+          <div className="w-full h-full min-w-0 transform-gpu" style={{ transform: 'translateZ(0)' }}>
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart cx="50%" cy="50%" outerRadius="65%" data={chartData}>
                 <defs>

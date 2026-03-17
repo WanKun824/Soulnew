@@ -44,7 +44,7 @@ const AnimatedRadarChart: React.FC<{ data: any[]; text: any }> = ({ data, text }
   const animatedData = data.map(d => ({ ...d, A: d.A * animValue }));
 
   return (
-    <div ref={ref} className="relative w-full aspect-square max-w-[360px] mx-auto">
+    <div ref={ref} className="relative w-full aspect-square max-w-[360px] mx-auto transform-gpu" style={{ transform: 'translateZ(0)' }}>
       {/* Radial glow layers with increased vibrancy */}
       <motion.div
         className="absolute inset-0 rounded-full pointer-events-none"

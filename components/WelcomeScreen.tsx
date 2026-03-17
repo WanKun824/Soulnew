@@ -28,7 +28,7 @@ const FlowingBackground: React.FC = () => (
         scale: [1, 1.2, 0.9, 1],
       }}
       transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-      className="absolute -top-[20%] -left-[10%] w-[80%] h-[80%] rounded-full bg-indigo-600/20 blur-[120px]"
+      className="absolute -top-[20%] -left-[10%] w-[80%] h-[80%] rounded-full bg-indigo-600/20 blur-[80px] will-change-transform"
     />
     <motion.div
       animate={{
@@ -37,7 +37,7 @@ const FlowingBackground: React.FC = () => (
         scale: [1, 0.8, 1.1, 1],
       }}
       transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
-      className="absolute top-[20%] -right-[10%] w-[70%] h-[70%] rounded-full bg-fuchsia-600/15 blur-[100px]"
+      className="absolute top-[20%] -right-[10%] w-[70%] h-[70%] rounded-full bg-fuchsia-600/15 blur-[80px] will-change-transform"
     />
     <motion.div
       animate={{
@@ -46,7 +46,7 @@ const FlowingBackground: React.FC = () => (
         scale: [1, 1.3, 1, 1],
       }}
       transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
-      className="absolute -bottom-[20%] left-[20%] w-[60%] h-[60%] rounded-full bg-rose-600/10 blur-[110px]"
+      className="absolute -bottom-[20%] left-[20%] w-[60%] h-[60%] rounded-full bg-rose-600/10 blur-[80px] will-change-transform"
     />
     <motion.div
       animate={{
@@ -321,7 +321,8 @@ export const WelcomeScreen: React.FC<Props> = ({ onStart, onLookup, onSocial, te
           <motion.div
             initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.9, ease: 'easeOut' }}
-            className="max-w-3xl"
+            className="max-w-3xl transform-gpu"
+            style={{ transform: 'translateZ(0)' }}
           >
             <div className="inline-flex items-center gap-2 px-6 py-2 rounded-full border border-white/15 bg-white/8 backdrop-blur-md mb-8">
               <Sparkles size={14} className="text-yellow-200" />
