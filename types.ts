@@ -6,7 +6,10 @@ export enum AppStep {
   QUIZ,
   ANALYZING,
   RESULTS,
-  LOOKUP
+  LOOKUP,
+  MATCHMAKING,
+  INBOX,
+  CHAT
 }
 
 export enum Dimension {
@@ -67,6 +70,45 @@ export interface MatchProfile {
   timestamp?: number;
   /** Seed used for deterministic question selection — enables no-DB Soul ID lookup */
   seed?: number;
+}
+
+export interface QuizAttempt {
+  id: string;
+  userId: string;
+  soulId: string;
+  status: 'pending' | 'completed' | 'failed';
+  questions: Question[];
+  answers: QuizAnswer[];
+  analysisResult?: MatchProfile;
+  createdAt: string;
+}
+
+export interface SocialProfile {
+  id: string;
+  soulTitle: string;
+  summary: string;
+  radarScores: number[];
+  distance?: number;
+  age?: number;
+  gender?: string;
+  idealPartner?: any;
+}
+
+export interface Match {
+  id: string;
+  user1Id: string;
+  user2Id: string;
+  createdAt: string;
+  otherUser?: SocialProfile;
+  lastMessage?: Message;
+}
+
+export interface Message {
+  id: string;
+  matchId: string;
+  senderId: string;
+  content: string;
+  createdAt: string;
 }
 
 /** Re-export Language from config — types.ts remains the single import target for callers */

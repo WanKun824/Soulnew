@@ -6,12 +6,20 @@ import { WelcomeScreen } from './components/WelcomeScreen';
 const QuizScreen = React.lazy(() => import('./components/QuizScreen').then(m => ({ default: m.QuizScreen })));
 const ResultsScreen = React.lazy(() => import('./components/ResultsScreen').then(m => ({ default: m.ResultsScreen })));
 const LookupScreen = React.lazy(() => import('./components/LookupScreen').then(m => ({ default: m.LookupScreen })));
+const MatchScreen = React.lazy(() => import('./components/MatchScreen').then(m => ({ default: m.MatchScreen })));
+const MatchHub = React.lazy(() => import('./components/MatchHub').then(m => ({ default: m.MatchHub })));
+const ChatWindow = React.lazy(() => import('./components/ChatWindow').then(m => ({ default: m.ChatWindow })));
 
 import { ToastContainer, useToast } from './components/Toast';
-import { AppStep, Question, UserDemographics, QuizAnswer, MatchProfile, Language } from './types';
-import { generateQuizQuestions, analyzeProfile, getProfileBySoulId, translateQuestions } from './services/geminiService';
-import { Loader2 } from 'lucide-react';
+import { AppStep, Question, UserDemographics, QuizAnswer, MatchProfile, Language, SocialProfile, Match } from './types';
+import { generateQuizQuestions, analyzeProfile, getProfileBySoulId, translateQuestions, saveQuizAttempt } from './services/soulService';
+import { Loader2, LogIn, LogOut, User as UserIcon } from 'lucide-react';
 import { translations } from './utils/translations';
+import { AuthModal } from './components/AuthModal';
+import { UserSettingsModal } from './components/UserSettingsModal';
+import { onAuthStateChange, getCurrentUser, signOut } from './services/auth';
+import { supabase } from './services/supabase';
+import type { User } from '@supabase/supabase-js';
 
 // ── Animated analysis messages ────────────────────────
 const ANALYSIS_MESSAGES_ZH = [
@@ -101,11 +109,92 @@ function AnalyzingScreen({ language }: { language: Language }) {
 export default function App() {
   const [step, setStep] = useState<AppStep>(AppStep.WELCOME);
   const [demographics, setDemographics] = useState<UserDemographics | null>(null);
+  
+  const [sessionUser, setSessionUser] = useState<User | null>(null);
+  
+  // DEBUG LOGGING
+  useEffect(() => {
+    console.log('App: Demographics State Changed ->', demographics);
+  }, [demographics]);
+
+  useEffect(() => {
+    console.log('App: SessionUser State Changed ->', sessionUser?.email);
+  }, [sessionUser]);
+
   const [questions, setQuestions] = useState<Question[]>([]);
   const [questionSeed, setQuestionSeed] = useState<number>(0);
   const [profile, setProfile] = useState<MatchProfile | null>(null);
   const [language, setLanguage] = useState<Language>('zh');
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [activeMatch, setActiveMatch] = useState<Match | null>(null);
+  const [currentUserScores, setCurrentUserScores] = useState<number[] | undefined>(undefined);
   const { toasts, showToast, dismiss } = useToast();
+
+  // 1. Initial load from LocalStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('soul_demographics');
+    if (saved) {
+      try {
+        setDemographics(JSON.parse(saved));
+      } catch (e) {
+        console.error('Failed to parse saved demographics', e);
+      }
+    }
+  }, []);
+
+  // 2. Persist to LocalStorage whenever changed
+  useEffect(() => {
+    if (demographics) {
+      localStorage.setItem('soul_demographics', JSON.stringify(demographics));
+    }
+  }, [demographics]);
+
+  // Handle Authentication State
+  useEffect(() => {
+    getCurrentUser().then(u => {
+      console.log('App: Initial user check ->', u?.email);
+      setSessionUser(u);
+    });
+    const subscription = onAuthStateChange((user) => {
+      console.log('App: Auth state change detected ->', user?.email);
+      setSessionUser(user);
+    });
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  // Fetch demographics from Supabase when user logs in
+  useEffect(() => {
+    if (sessionUser) {
+      console.log('App: Fetching demographics for', sessionUser.id);
+      supabase.from('profiles').select('age, gender, interested_in, radar_scores').eq('id', sessionUser.id).single()
+        .then(({ data, error }) => {
+          if (data && !error) {
+            console.log('App: Received demographics from DB', data);
+            const demo = {
+              age: String(data.age),
+              gender: data.gender,
+              interestedIn: data.interested_in,
+            };
+            setDemographics(demo);
+            localStorage.setItem('soul_demographics', JSON.stringify(demo));
+            if (data.radar_scores) {
+              const raw = data.radar_scores;
+              const parsed = Array.isArray(raw) 
+                ? raw 
+                : (typeof raw === 'string' 
+                   ? raw.replace(/[\[\]]/g, '').split(',').map(Number)
+                   : [0,0,0,0,0]);
+              setCurrentUserScores(parsed);
+            }
+          } else {
+            console.log('App: No demographics in DB or error', error);
+          }
+        });
+    }
+  }, [sessionUser]);
 
   // Handle ?code= URL param for direct Soul ID lookup
   useEffect(() => {
@@ -131,7 +220,20 @@ export default function App() {
     }
   }, [questions.length, step]);
 
-  const handleStart = () => {
+  const handleStart = (demoOverride?: UserDemographics) => {
+    if (!sessionUser) {
+      setShowAuthModal(true);
+      showToast('请先登录开启灵魂旅程', 'info');
+      return;
+    }
+
+    const activeDemo = demoOverride || demographics;
+    
+    if (!activeDemo) {
+      setShowSettingsModal(true);
+      return;
+    }
+
     if (questions.length > 0) {
       setStep(AppStep.QUIZ);
     } else {
@@ -142,16 +244,98 @@ export default function App() {
     }
   };
 
-  const handleQuizComplete = async (demo: UserDemographics, userAnswers: QuizAnswer[]) => {
-    setDemographics(demo);
+
+  const handleQuizComplete = async (userAnswers: QuizAnswer[]) => {
+    let activeDemo = demographics;
+    
+    // Fallback: If state is lost, try to recover from LocalStorage before giving up
+    if (!activeDemo) {
+      const saved = localStorage.getItem('soul_demographics');
+      if (saved) {
+        try {
+          activeDemo = JSON.parse(saved);
+          setDemographics(activeDemo);
+          console.log('handleQuizComplete: Recovered demographics from LocalStorage');
+        } catch (e) {
+          console.error('handleQuizComplete: Failed to recover from LocalStorage', e);
+        }
+      }
+    }
+
+    if (!activeDemo) {
+      console.error('Quiz complete but demographics missing!');
+      showToast('资料丢失，请重新设置', 'error');
+      setStep(AppStep.WELCOME);
+      return;
+    }
+
+    console.log('handleQuizComplete: Moving to ANALYZING step');
     setStep(AppStep.ANALYZING);
+
+    let attemptId: string | undefined;
+
+    // Save attempt if logged in
+    if (sessionUser) {
+      try {
+        console.log('handleQuizComplete: Saving attempt to DB...');
+        attemptId = await saveQuizAttempt(
+          sessionUser.id,
+          activeDemo,
+          questions,
+          userAnswers,
+          questionSeed,
+          language
+        );
+        console.log('handleQuizComplete: Attempt saved ->', attemptId);
+      } catch (err) {
+        console.warn('handleQuizComplete: Failed to save attempt, proceeding with analysis anyway', err);
+      }
+    }
+
     try {
-      const result = await analyzeProfile(demo, questions, userAnswers, language, questionSeed);
+      console.log('handleQuizComplete: Calling analyzeProfile...');
+      const result = await analyzeProfile(activeDemo, questions, userAnswers, language, questionSeed, attemptId);
+      console.log('handleQuizComplete: Analysis successful for', result.soulId);
       setProfile(result);
       setStep(AppStep.RESULTS);
     } catch (err) {
-      console.error('Analysis error', err);
-      showToast('分析失败，请重试', 'error');
+      console.error('handleQuizComplete: Analysis error', err);
+      if (attemptId) {
+        // Explicitly update failed status in DB if we had an attemptId
+        import('./services/soulService').then(m => m.updateQuizAttemptStatus(attemptId!, 'failed'));
+      }
+      showToast('分析失败，已为您保存答题进度，可稍后重试', 'error');
+      setStep(AppStep.WELCOME);
+    }
+  };
+
+  const handleRetryAttempt = async (attempt: import('./types').QuizAttempt) => {
+    // Attempt to recover demographics from the soulId
+    const decoded = import('./services/soulService').then(m => m.decodeSoulId(attempt.soulId));
+    
+    // For simplicity, we decode synchronously if we were to refactor, 
+    // but here we can just trigger analysis as it's already encoded in soulId
+    console.log('App: Retrying analysis for attempt', attempt.id);
+    setStep(AppStep.ANALYZING);
+    
+    try {
+      const { decodeSoulId } = await import('./services/soulService');
+      const decoded = decodeSoulId(attempt.soulId);
+      const activeDemo = decoded?.demographics ?? demographics ?? { age: '25', gender: 'male', interestedIn: 'women' };
+      
+      const result = await analyzeProfile(
+        activeDemo,
+        attempt.questions,
+        attempt.answers,
+        language,
+        decoded?.seed ?? 0,
+        attempt.id
+      );
+      setProfile(result);
+      setStep(AppStep.RESULTS);
+    } catch (err) {
+      console.error('handleRetryAttempt: Error', err);
+      showToast('重试失败，请稍后', 'error');
       setStep(AppStep.WELCOME);
     }
   };
@@ -189,12 +373,44 @@ export default function App() {
 
       <div className="flex flex-col font-sans text-white min-h-screen">
         {/* ── Header ── */}
-        <header className="fixed top-0 w-full p-5 z-50 flex justify-between items-center">
+        <header className="fixed top-0 w-full p-5 z-50 flex justify-between items-center bg-gradient-to-b from-black/60 to-transparent">
           <button onClick={() => { setStep(AppStep.WELCOME); window.history.pushState({}, document.title, window.location.pathname); }}
             className="font-bold text-sm tracking-widest uppercase text-white/80 hover:text-white transition-opacity">
             Soul Journey
           </button>
           <div className="flex items-center gap-3">
+            {sessionUser ? (
+              <div className="flex items-center gap-3 border-r border-white/10 pr-3">
+                {/* User Profile Button */}
+                <button 
+                  onClick={() => setShowSettingsModal(true)}
+                  className="flex items-center gap-2 cursor-pointer group hover:bg-white/5 p-1 rounded-full transition-colors border border-transparent hover:border-white/10"
+                  title="编辑个人资料"
+                >
+                  <div className="w-6 h-6 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center">
+                    <UserIcon size={12} className="text-indigo-400" />
+                  </div>
+                  <span className="text-xs font-mono text-white/60 group-hover:text-white transition-colors hidden sm:inline-block pr-2">
+                    {sessionUser.email?.split('@')[0]}
+                  </span>
+                </button>
+                {/* Logout Button */}
+                <button 
+                  onClick={async () => { await signOut(); showToast('已退出登录', 'info'); }}
+                  className="p-1.5 text-white/30 hover:text-rose-400 transition-colors"
+                  title="退出登录"
+                >
+                  <LogOut size={16} />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 border-r border-white/10 pr-3">
+                <button onClick={() => setShowAuthModal(true)} className="flex items-center gap-1.5 text-xs font-bold uppercase text-white/60 hover:text-indigo-300 transition-colors">
+                  <LogIn size={14} /> 登录
+                </button>
+              </div>
+            )}
+
             <button onClick={toggleLanguage}
               disabled={step === AppStep.QUIZ || step === AppStep.ANALYZING}
               className={`text-xs font-bold uppercase text-white/50 hover:text-white transition-colors bg-white/8 px-3 py-1 rounded-full backdrop-blur border border-white/10
@@ -202,20 +418,46 @@ export default function App() {
               {language === 'en' ? 'EN' : language === 'zh' ? '中文' : '日本語'}
             </button>
             {step !== AppStep.WELCOME && (
-              <button onClick={handleRestart} className="text-xs font-bold uppercase text-white/40 hover:text-white transition-colors">Exit</button>
+              <button onClick={handleRestart} className="text-xs font-bold uppercase text-white/40 hover:text-white transition-colors ml-2">Exit</button>
             )}
           </div>
         </header>
 
         {/* ── Pages ── */}
         <main className="flex-grow w-full">
-          {step === AppStep.WELCOME && <WelcomeScreen onStart={handleStart} onLookup={() => setStep(AppStep.LOOKUP)} text={t.welcome} />}
+          {step === AppStep.WELCOME && (
+            <WelcomeScreen 
+              onStart={handleStart} 
+              onLookup={() => {
+                if (!sessionUser) {
+                  setShowAuthModal(true);
+                  showToast('请先登录查看档案', 'info');
+                } else {
+                  setStep(AppStep.LOOKUP);
+                }
+              }} 
+              onSocial={() => {
+                if (!sessionUser) {
+                  setShowAuthModal(true);
+                  showToast('请先登录开启灵魂共振', 'info');
+                } else {
+                  setStep(AppStep.MATCHMAKING);
+                }
+              }}
+              text={t.welcome} 
+            />
+          )}
 
           {step === AppStep.LOOKUP && (
-            <div className="min-h-screen flex items-center justify-center px-4 pt-20">
+            <div className="min-h-screen flex items-center justify-center px-4 pt-20 pb-10">
               <React.Suspense fallback={<div className="text-white/50">Loading...</div>}>
-                <LookupScreen onBack={() => setStep(AppStep.WELCOME)}
-                  onProfileFound={p => { setProfile(p); setStep(AppStep.RESULTS); }} text={t.lookup} />
+                <LookupScreen 
+                  onBack={() => setStep(AppStep.WELCOME)} 
+                  onProfileFound={(p) => { setProfile(p); setStep(AppStep.RESULTS); }} 
+                  onRetry={handleRetryAttempt}
+                  userId={sessionUser?.id}
+                  text={t.lookup} 
+                />
               </React.Suspense>
             </div>
           )}
@@ -235,17 +477,79 @@ export default function App() {
 
           {step === AppStep.QUIZ && questions.length > 0 && (
             <React.Suspense fallback={<div className="min-h-screen flex items-center justify-center text-white/50">Loading quiz...</div>}>
-              <QuizScreen questions={questions} language={language} onComplete={handleQuizComplete} text={t.quiz} />
+              <QuizScreen 
+                questions={questions} 
+                language={language} 
+                onComplete={handleQuizComplete} 
+                text={t.quiz} 
+              />
             </React.Suspense>
           )}
 
           {step === AppStep.RESULTS && profile && (
             <React.Suspense fallback={<div className="min-h-screen flex items-center justify-center text-white/50">Loading results...</div>}>
-              <ResultsScreen profile={profile} onRestart={handleRestart} text={t.results} />
+              <ResultsScreen 
+                profile={profile} 
+                onRestart={handleRestart} 
+                text={t.results} 
+                onGoSocial={() => setStep(AppStep.MATCHMAKING)}
+              />
+            </React.Suspense>
+          )}
+
+          {step === AppStep.MATCHMAKING && (
+            <React.Suspense fallback={<div className="min-h-screen flex items-center justify-center text-white/50">Loading Discovery...</div>}>
+              <MatchScreen 
+                language={language}
+                currentUserScores={currentUserScores || profile?.scores.map(s => s.score)}
+                onBack={() => setStep(AppStep.WELCOME)}
+                onGoToInbox={() => setStep(AppStep.INBOX)}
+                onMatch={(p) => {
+                  showToast(` 与 ${p.soulTitle} 建立连接！`, 'success');
+                }}
+              />
+            </React.Suspense>
+          )}
+
+          {step === AppStep.INBOX && (
+            <React.Suspense fallback={<div className="min-h-screen flex items-center justify-center text-white/50">Loading Inbox...</div>}>
+              <MatchHub 
+                language={language}
+                onBack={() => setStep(AppStep.WELCOME)}
+                onSelectMatch={(m) => {
+                  setActiveMatch(m);
+                  setStep(AppStep.CHAT);
+                }}
+              />
+            </React.Suspense>
+          )}
+
+          {step === AppStep.CHAT && activeMatch && (
+            <React.Suspense fallback={<div className="min-h-screen flex items-center justify-center text-white/50">Opening Connection...</div>}>
+              <ChatWindow 
+                match={activeMatch}
+                language={language}
+                onBack={() => setStep(AppStep.INBOX)}
+              />
             </React.Suspense>
           )}
         </main>
       </div>
+
+      <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} onSuccess={() => setShowAuthModal(false)} />
+      <UserSettingsModal 
+        isOpen={showSettingsModal} 
+        onClose={() => setShowSettingsModal(false)} 
+        demographics={demographics} 
+        language={language}
+        text={t.settings}
+        onSave={(demo) => { 
+          setDemographics(demo); 
+          setShowSettingsModal(false); 
+          // Use direct data to bypass state async delay
+          if (step === AppStep.WELCOME) handleStart(demo); 
+        }} 
+      />
 
       {/* ── Global Toast container ── */}
       <ToastContainer toasts={toasts} onDismiss={dismiss} />

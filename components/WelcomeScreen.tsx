@@ -8,8 +8,59 @@ import { motion } from 'framer-motion';
 interface Props {
   onStart: () => void;
   onLookup: () => void;
+  onSocial: () => void;
   text: typeof translations['en']['welcome'];
 }
+
+// ─────────────────────────────────────────
+// Flowing Animated Background
+// ─────────────────────────────────────────
+const FlowingBackground: React.FC = () => (
+  <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+    {/* Base dark canvas */}
+    <div className="absolute inset-0 bg-[#030014]" />
+    
+    {/* Animated Blobs */}
+    <motion.div
+      animate={{
+        x: [0, 100, -50, 0],
+        y: [0, -50, 50, 0],
+        scale: [1, 1.2, 0.9, 1],
+      }}
+      transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+      className="absolute -top-[20%] -left-[10%] w-[80%] h-[80%] rounded-full bg-indigo-600/20 blur-[120px]"
+    />
+    <motion.div
+      animate={{
+        x: [0, -120, 80, 0],
+        y: [0, 100, -40, 0],
+        scale: [1, 0.8, 1.1, 1],
+      }}
+      transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
+      className="absolute top-[20%] -right-[10%] w-[70%] h-[70%] rounded-full bg-fuchsia-600/15 blur-[100px]"
+    />
+    <motion.div
+      animate={{
+        x: [0, 50, -100, 0],
+        y: [0, 80, 120, 0],
+        scale: [1, 1.3, 1, 1],
+      }}
+      transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
+      className="absolute -bottom-[20%] left-[20%] w-[60%] h-[60%] rounded-full bg-rose-600/10 blur-[110px]"
+    />
+    <motion.div
+      animate={{
+        rotate: [0, 360],
+      }}
+      transition={{ duration: 40, repeat: Infinity, ease: "linear" }}
+      className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full opacity-[0.03]"
+      style={{
+        backgroundImage: 'radial-gradient(circle at center, white 1px, transparent 1px)',
+        backgroundSize: '40px 40px',
+      }}
+    />
+  </div>
+);
 
 // ─────────────────────────────────────────
 // Vaporwave neon animation panels – NO TEXT
@@ -232,7 +283,7 @@ const FeatureSection: React.FC<FProps> = ({ icon, title, desc, reverse = false, 
 // ─────────────────────────────────────────
 // Main WelcomeScreen
 // ─────────────────────────────────────────
-export const WelcomeScreen: React.FC<Props> = ({ onStart, onLookup, text }) => {
+export const WelcomeScreen: React.FC<Props> = ({ onStart, onLookup, onSocial, text }) => {
   const features = [
     {
       icon: <Brain size={22} />,
@@ -243,8 +294,8 @@ export const WelcomeScreen: React.FC<Props> = ({ onStart, onLookup, text }) => {
     },
     {
       icon: <Sparkles size={22} />,
-      title: 'Gemini AI 深度解析',
-      desc: '最新 Gemini 模型接管分析，像关系心理学家一样解读你的内在矛盾、情感格局与精神图腾。',
+      title: 'AI 深度解析',
+      desc: '先进的大语言模型接管分析，像关系心理学家一样解读你的内在矛盾、情感格局与精神图腾。',
       neonColor: '#00FFFF',
       reverse: true,
       visual: <VaporEKG />,
@@ -259,7 +310,8 @@ export const WelcomeScreen: React.FC<Props> = ({ onStart, onLookup, text }) => {
   ];
 
   return (
-    <div className="w-full flex flex-col text-white font-sans overflow-x-hidden">
+    <div className="w-full flex flex-col text-white font-sans overflow-x-hidden relative">
+      <FlowingBackground />
 
       {/* ══ HERO ══ */}
       <section className="min-h-screen flex flex-col relative pt-24 px-6 text-center overflow-hidden">
@@ -271,29 +323,33 @@ export const WelcomeScreen: React.FC<Props> = ({ onStart, onLookup, text }) => {
             transition={{ duration: 0.9, ease: 'easeOut' }}
             className="max-w-3xl"
           >
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-white/15 bg-white/8 backdrop-blur-md mb-8">
-              <Sparkles size={12} className="text-yellow-200" />
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/70">AI-Powered Relationship Psychology</span>
+            <div className="inline-flex items-center gap-2 px-6 py-2 rounded-full border border-white/15 bg-white/8 backdrop-blur-md mb-8">
+              <Sparkles size={14} className="text-yellow-200" />
+              <span className="text-[11px] font-bold uppercase tracking-[0.25em] text-white/90">AI-Powered Relationship Psychology</span>
             </div>
 
             <h1 className="text-5xl sm:text-6xl md:text-8xl font-bold tracking-tight mb-6 leading-[1.05]">
               了解<span className="bg-gradient-to-r from-indigo-400 via-fuchsia-400 to-rose-400 bg-clip-text text-transparent">真实的</span>自己
             </h1>
-            <p className="text-lg md:text-xl text-white/60 font-light mb-10 max-w-xl mx-auto leading-relaxed">
-              60道深度问题 × Gemini AI 解析，为你绘制灵魂图谱
+            <p className="text-lg md:text-xl text-white/60 font-light mb-12 max-w-xl mx-auto leading-relaxed">
+              60道深度问题 × AI 核心解析，为你绘制灵魂图谱
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <div className="flex flex-col sm:flex-row gap-5 justify-center w-full px-4 sm:px-0">
               <Button onClick={onStart}
-                className="text-base px-8 py-4 rounded-full liquid-glass-primary flex items-center justify-center gap-2 font-semibold hover:scale-105">
-                {text.startBtn} <ArrowRight size={18} />
+                className="w-full sm:w-auto text-base sm:text-xl px-10 sm:px-14 py-4 sm:py-6 rounded-full liquid-glass-primary flex items-center justify-center gap-3 font-bold hover:scale-110 shadow-[0_0_40px_-10px_rgba(99,102,241,0.5)] transition-all">
+                {text.startBtn} <ArrowRight size={18} className="sm:w-5 sm:h-5" />
               </Button>
               <button onClick={onLookup}
-                className="liquid-glass-btn px-8 py-4 rounded-full text-white font-medium hover:scale-105">
+                className="w-full sm:w-auto liquid-glass-btn px-10 sm:px-14 py-4 sm:py-6 rounded-full text-white text-base sm:text-lg font-semibold hover:scale-110 border border-white/10 transition-all">
                 {text.lookupBtn}
               </button>
+              <button onClick={onSocial}
+                className="w-full sm:w-auto liquid-glass border border-indigo-500/30 px-10 sm:px-14 py-4 sm:py-6 rounded-full text-indigo-300 text-base sm:text-lg font-semibold hover:bg-indigo-500/20 hover:scale-110 transition-all flex items-center justify-center gap-3">
+                <Heart size={18} className="sm:w-5 sm:h-5" /> 灵魂契合
+              </button>
             </div>
-            <p className="mt-6 text-xs text-white/25 font-mono tracking-widest uppercase">{text.timeEst}</p>
+            <p className="mt-10 text-xs text-white/25 font-mono tracking-widest uppercase">{text.timeEst}</p>
           </motion.div>
         </div>
 
@@ -346,7 +402,7 @@ export const WelcomeScreen: React.FC<Props> = ({ onStart, onLookup, text }) => {
               {
                 icon: '✦',
                 title: '不要标签，要叙事',
-                body: 'MBTI 给你四个字母，色彩性格给你贴颜色——但人比任何标签都复杂。Gemini AI 用几百字描述你，而不是一个字母。',
+                body: 'MBTI 给你四个字母，色彩性格给你贴颜色——但人比任何标签都复杂。AI 用一段文字深刻描述你，而不是一个字母。',
               },
               {
                 icon: '✦',
@@ -382,18 +438,18 @@ export const WelcomeScreen: React.FC<Props> = ({ onStart, onLookup, text }) => {
           </h2>
           <p className="text-white/40 mb-8 text-base">60道问题，揭开你最真实的内心世界。</p>
           <Button onClick={onStart}
-            className="text-base px-10 py-4 rounded-full liquid-glass-primary flex items-center gap-2 font-semibold hover:scale-105 mx-auto">
-            {text.startBtn} <ArrowRight size={18} />
+            className="w-full sm:w-auto text-base sm:text-xl px-10 sm:px-14 py-4 sm:py-6 rounded-full liquid-glass-primary flex items-center justify-center gap-3 font-bold hover:scale-110 mx-auto transition-all">
+            {text.startBtn} <ArrowRight size={18} className="sm:w-5 sm:h-5" />
           </Button>
         </motion.div>
       </section>
 
       {/* ══ FOOTER ══ */}
-      <footer className="py-8 px-6 text-center border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-3 max-w-5xl mx-auto w-full">
-        <p className="text-[10px] uppercase tracking-[0.3em] text-white/20">Soul Journey · Powered by Gemini AI</p>
-        <div className="flex items-center gap-1.5 text-[10px] text-white/20">
+      <footer className="py-12 px-6 text-center border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4 max-w-5xl mx-auto w-full">
+        <p className="text-[10px] uppercase tracking-[0.4em] text-white/20">Soul Journey · Digital Authenticity Protocol</p>
+        <div className="flex items-center gap-1.5 text-[10px] text-white/15">
           <Fingerprint size={10} />
-          <span>所有数据仅存于本地，不上传服务器</span>
+          <span>数据Preserved于本地逻辑，安全且私密</span>
         </div>
       </footer>
     </div>

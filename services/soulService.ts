@@ -4,9 +4,11 @@ import { Question, QuizAnswer, UserDemographics, MatchProfile, Language, Questio
 import { MASTER_QUESTION_BANK } from "../data/questionBank";
 import { calculateScores } from "./scoring";
 import { saveToCache, getFromCache } from "./database";
+import { supabase } from "./supabase";
+import { getCurrentUser } from "./auth";
 
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-const MODEL = 'gemini-3-flash-preview';
+const MODEL = 'gemini-2.5-flash'; // Reverted to a more stable model name
 
 // ============================================================
 // SEEDED PRNG (Mulberry32) & SHUFFLE
@@ -126,7 +128,7 @@ export function decodeSoulId(soulId: string): {
 } | null {
   try {
     const raw = soulId.replace(/-/g, '');
-    if (raw.length !== SOUL_ID_B62_LEN) return null;
+    if (raw.length < 30 || raw.length > 40) return null; // Allow slight length variations (up to ~37 chars)
     if (![...raw].every(c => BASE62.includes(c))) return null;
     const vals = unpackBits(base62ToBytes(raw), BIT_SCHEMA);
     const [seed, ageDelta, genderIdx, intIdx, langIdx, ...rawAnswers] = vals;
@@ -201,7 +203,7 @@ const LOCAL_FALLBACK: Record<Language, AIResult> = {
   },
 };
 
-const callGeminiAI = async (
+const callSoulAI = async (
   demographics: UserDemographics, questions: Question[],
   answers: QuizAnswer[], language: Language
 ): Promise<AIResult | null> => {
@@ -215,7 +217,7 @@ const callGeminiAI = async (
     type: Type.OBJECT,
     properties: {
       summary: { type: Type.STRING },
-      mbtiType: { type: Type.STRING, description: "A creative, metaphorical soul title" },
+      mbtiType: { type: Type.STRING, description: "A rich, evocative archetype title (e.g. 理性实用主义者, 进取心极强的创业者, 浪漫理想家)" },
       idealPartner: {
         type: Type.OBJECT,
         properties: {
@@ -228,27 +230,51 @@ const callGeminiAI = async (
     },
   };
   try {
+    console.log('CallSoulAI: Initializing with model', MODEL);
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: MODEL,
-      contents: `You are a world-class relationship psychologist. Analyze this 60-question "Soul Journey" profile.
+      contents: `You are a world-class relationship psychologist and insightful observer of human souls. Analyze this 60-question "Soul Journey" profile.
 Input: Age/Gender/Seeking: ${demographics.age}, ${demographics.gender}, ${demographics.interestedIn}
 Answers (1=Strongly Disagree, 5=Strongly Agree):
 ${transcript}
 
-Generate:
-1. Soul Title: A poetic archetype (e.g. "The Velvet Storm").
-2. Deep Summary: Profound analysis of their inner contradictions using metaphors grounded in data.
-3. Ideal Partner: Description paragraph + 3-5 magnetic traits to seek + 3-5 dealbreakers.
-4. Compatibility Advice: One specific, actionable relationship tip.
+Generate a profile following these strict rules:
+1. Soul Title: A rich, multi-layered archetype (e.g. "理性实用主义者", "进取心极强的创业者", "平和的极简主义者", "自由的灵魂", "深情的守护者"). Make it evocative and descriptive.
+2. Deep Summary: A complete, profound, and concise analysis using the second person ("You"/"你"). Do NOT limit to a specific number of sentences; focus on capturing the soul's essence with depth and clarity. NO fluff.
+3. Ideal Partner: A short paragraph describing their essence match + 3-5 magnetic traits + 3-5 dissonance/deal-breakers. 
+4. Formatting: NO COMMAS (",") within any trait or deal-breaker tag. Ensure the "Magnetic Traits" (吸引) and "Dissonance" (排斥) represent different psychological facets and are NOT just opposites of each other.
+5. Tone: Analytical, empathetic, and professional.
 
-Output Language: ${langName}. ALL JSON string values MUST be in ${langName}.`,
+Output Language: ${langName}. ALL JSON string values MUST be in ${langName}. Use "你" (You) for all descriptions.`,
       config: { responseMimeType: 'application/json', responseSchema: schema },
     });
-    if (response.text) return JSON.parse(response.text) as AIResult;
-    return null;
+    
+    console.log('CallSoulAI: Received response from API');
+    
+    let text = '';
+    // Handle SDK differences: response.text can be a function, a getter/string, or missing
+    try {
+      const respAny = response as any;
+      if (typeof respAny.text === 'function') {
+        text = await respAny.text();
+      } else if (typeof respAny.text === 'string') {
+        text = respAny.text;
+      } else {
+        text = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      }
+    } catch (parseErr) {
+      console.warn('CallSoulAI: Error getting text from response object', parseErr);
+      text = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    }
+
+    if (text) {
+      console.log('CallSoulAI: Successfully extracted text', text.substring(0, 100) + '...');
+      return JSON.parse(text) as AIResult;
+    }
+    
   } catch (e) {
-    console.warn('Gemini call failed, using offline fallback', e);
+    console.error('CallSoulAI: Critical error during API call', e);
     return null;
   }
 };
@@ -256,22 +282,6 @@ Output Language: ${langName}. ALL JSON string values MUST be in ${langName}.`,
 // ============================================================
 // PUBLIC API
 // ============================================================
-
-export const analyzeProfile = async (
-  demographics: UserDemographics, questions: Question[],
-  answers: QuizAnswer[], language: Language, seed: number
-): Promise<MatchProfile> => {
-  const aiResult = (await callGeminiAI(demographics, questions, answers, language)) ?? LOCAL_FALLBACK[language];
-  const scores = calculateScores(questions, answers, language);
-  const soulId = encodeSoulId(seed, demographics, questions, answers, language);
-  const profile: MatchProfile = {
-    soulId, summary: aiResult.summary, mbtiType: aiResult.mbtiType, scores,
-    idealPartner: aiResult.idealPartner, compatibilityAdvice: aiResult.compatibilityAdvice,
-    timestamp: Date.now(), history: { questions, answers }, seed,
-  };
-  await saveToCache(profile);
-  return profile;
-};
 
 export const getProfileBySoulId = async (soulId: string): Promise<MatchProfile | null> => {
   const cached = getFromCache(soulId);
@@ -285,7 +295,7 @@ export const getProfileBySoulId = async (soulId: string): Promise<MatchProfile |
     questionId: questions[i]?.id ?? i, value: v as import('../types').LikertValue,
   }));
 
-  const aiResult = (await callGeminiAI(decoded.demographics, questions, answers, decoded.language)) ?? LOCAL_FALLBACK[decoded.language];
+  const aiResult = (await callSoulAI(decoded.demographics, questions, answers, decoded.language)) ?? LOCAL_FALLBACK[decoded.language];
   const scores = calculateScores(questions, answers, decoded.language);
   const profile: MatchProfile = {
     soulId, summary: aiResult.summary, mbtiType: aiResult.mbtiType, scores,
@@ -293,5 +303,140 @@ export const getProfileBySoulId = async (soulId: string): Promise<MatchProfile |
     timestamp: Date.now(), history: { questions, answers }, seed: decoded.seed,
   };
   await saveToCache(profile);
+  return profile;
+};
+
+// ============================================================
+// PERSISTENCE & HISTORY
+// ============================================================
+
+export const saveQuizAttempt = async (
+  userId: string,
+  demographics: UserDemographics,
+  questions: Question[],
+  answers: QuizAnswer[],
+  seed: number,
+  language: Language
+): Promise<string> => {
+  const soulId = encodeSoulId(seed, demographics, questions, answers, language);
+  const { data, error } = await supabase.from('quiz_attempts').insert({
+    user_id: userId,
+    soul_id: soulId,
+    questions,
+    answers,
+    status: 'pending'
+  }).select('id').single();
+
+  if (error) {
+    console.error('saveQuizAttempt: Database error', error);
+    throw error;
+  }
+  return data.id;
+};
+
+export const updateQuizAttemptStatus = async (
+  attemptId: string,
+  status: 'completed' | 'failed',
+  profile?: MatchProfile
+) => {
+  const { error } = await supabase.from('quiz_attempts').update({
+    status,
+    analysis_result: profile,
+  }).eq('id', attemptId);
+
+  if (error) console.error('updateQuizAttemptStatus: Error', error);
+};
+
+export const getUserAttempts = async (userId: string): Promise<import('../types').QuizAttempt[]> => {
+  const { data, error } = await supabase
+    .from('quiz_attempts')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('getUserAttempts: Error', error);
+    return [];
+  }
+
+  return data.map(d => ({
+    id: d.id,
+    userId: d.user_id,
+    soulId: d.soul_id,
+    status: d.status as any,
+    questions: d.questions,
+    answers: d.answers,
+    analysisResult: d.analysis_result,
+    createdAt: d.created_at
+  }));
+};
+
+export const analyzeProfile = async (
+  demographics: UserDemographics, questions: Question[],
+  answers: QuizAnswer[], language: Language, seed: number,
+  attemptId?: string
+): Promise<MatchProfile> => {
+  console.log('AnalyzeProfile: Starting full analysis...');
+  const aiResult = (await callSoulAI(demographics, questions, answers, language)) ?? LOCAL_FALLBACK[language];
+  console.log('AnalyzeProfile: AI/Fallback result obtained', aiResult.mbtiType);
+
+  const scores = calculateScores(questions, answers, language);
+  const soulId = encodeSoulId(seed, demographics, questions, answers, language);
+  console.log('AnalyzeProfile: Scores and SoulID calculated', soulId);
+  
+  const profile: MatchProfile = {
+    soulId, summary: aiResult.summary, mbtiType: aiResult.mbtiType, scores,
+    idealPartner: aiResult.idealPartner, compatibilityAdvice: aiResult.compatibilityAdvice,
+    timestamp: Date.now(), history: { questions, answers }, seed,
+  };
+
+  console.log('AnalyzeProfile: Profile object constructed');
+
+  // Save to local cache
+  try {
+    await saveToCache(profile);
+    console.log('AnalyzeProfile: Saved to local cache');
+  } catch (cacheErr) {
+    console.warn('AnalyzeProfile: Cache save failed', cacheErr);
+  }
+
+  // Cloud Sync
+  const user = await getCurrentUser();
+  if (user) {
+    // 1. Update the specific attempt status
+    if (attemptId) {
+      updateQuizAttemptStatus(attemptId, 'completed', profile);
+    }
+
+    // 2. Upsert the primary profile record for matchmaking
+    try {
+      const { Dimension } = await import('../types');
+      const scoreVector = [
+        scores.find(s => s.dimension === Dimension.WEALTH)?.score ?? 0,
+        scores.find(s => s.dimension === Dimension.FAMILY)?.score ?? 0,
+        scores.find(s => s.dimension === Dimension.LIFESTYLE)?.score ?? 0,
+        scores.find(s => s.dimension === Dimension.COMMUNICATION)?.score ?? 0,
+        scores.find(s => s.dimension === Dimension.GROWTH)?.score ?? 0,
+      ];
+
+      await supabase.from('profiles').upsert({
+        id: user.id,
+        soul_id: soulId,
+        soul_title: profile.mbtiType,
+        summary: profile.summary,
+        ideal_partner: profile.idealPartner,
+        compatibility_advice: profile.compatibilityAdvice,
+        radar_scores: scoreVector,
+        age: parseInt(demographics.age),
+        gender: demographics.gender,
+        interested_in: demographics.interestedIn,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'id' });
+      console.log('Successfully synced profile to Supabase');
+    } catch (innerError) {
+      console.error('Inner sync error:', innerError);
+    }
+  }
+
   return profile;
 };

@@ -36,16 +36,33 @@ export const DemographicsForm: React.FC<Props> = ({ onComplete, text }) => {
           {/* Age Input */}
           <div className="text-center group">
             <label className="block text-sm font-medium text-neutral-500 mb-6 uppercase tracking-widest">{text.ageLabel}</label>
-            <input
-              type="number"
-              min="18"
-              max="100"
-              required
-              className="w-full text-center text-7xl md:text-9xl font-thin text-white bg-transparent border-none focus:ring-0 outline-none placeholder:text-neutral-800 transition-all"
-              placeholder="22"
-              value={formData.age}
-              onChange={(e) => handleChange('age', e.target.value)}
-            />
+            <div className="flex items-center justify-center gap-6">
+              <button 
+                type="button" 
+                onClick={() => setFormData(prev => ({ ...prev, age: String(Math.max(18, (parseInt(prev.age || '22') - 1))) }))}
+                className="w-16 h-16 rounded-full border border-neutral-800 text-neutral-400 hover:border-neutral-500 hover:text-white flex items-center justify-center text-3xl transition-colors"
+              >
+                -
+              </button>
+              <input
+                type="number"
+                min="18"
+                max="100"
+                required
+                className="w-32 text-center text-7xl md:text-8xl font-thin text-white bg-transparent border-none focus:ring-0 outline-none placeholder:text-neutral-800 transition-all [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                style={{ MozAppearance: 'textfield' }}
+                placeholder="22"
+                value={formData.age}
+                onChange={(e) => handleChange('age', e.target.value)}
+              />
+              <button 
+                type="button" 
+                onClick={() => setFormData(prev => ({ ...prev, age: String(Math.min(100, (parseInt(prev.age || '22') + 1))) }))}
+                className="w-16 h-16 rounded-full border border-neutral-800 text-neutral-400 hover:border-neutral-500 hover:text-white flex items-center justify-center text-3xl transition-colors"
+              >
+                +
+              </button>
+            </div>
           </div>
 
           {/* Gender */}

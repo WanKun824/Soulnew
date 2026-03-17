@@ -6,60 +6,20 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 interface Props {
   questions: Question[];
   language: Language;
-  onComplete: (demographics: UserDemographics, answers: QuizAnswer[]) => void;
+  onComplete: (answers: QuizAnswer[]) => void;
   text: typeof translations['en']['quiz'];
 }
 
-type Slide =
-  | { kind: 'age' }
-  | { kind: 'gender' }
-  | { kind: 'interested' }
-  | { kind: 'question'; qIndex: number };
+type Slide = { kind: 'question'; qIndex: number };
 
 export const QuizScreen: React.FC<Props> = ({ questions, language, onComplete, text }) => {
-  const dt = translations[language].demographics;
-  const ALL_SLIDES: Slide[] = [
-    { kind: 'age' },
-    { kind: 'gender' },
-    { kind: 'interested' },
-    ...questions.map((_, i): Slide => ({ kind: 'question', qIndex: i })),
-  ];
+  const ALL_SLIDES: Slide[] = questions.map((_, i): Slide => ({ kind: 'question', qIndex: i }));
   const total = ALL_SLIDES.length;
 
   const [idx, setIdx] = useState(0);
-  const [demo, setDemo] = useState<UserDemographics>({ age: '25', gender: 'non-binary', interestedIn: 'everyone' });
-  const [age, setAge] = useState(25);
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [anim, setAnim] = useState<'in' | 'left' | 'right'>('in');
   const touchX = useRef(0);
-
-  // ── Age timer refs (fix: prevent stale closure bug) ──
-  const ageRef = useRef(25);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const stopPress = useCallback(() => {
-    if (timerRef.current !== null) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-  }, []);
-
-  const startPress = useCallback((delta: number) => {
-    stopPress();
-    const next = Math.min(100, Math.max(18, ageRef.current + delta));
-    ageRef.current = next;
-    setAge(next);
-    timerRef.current = setInterval(() => {
-      const n = Math.min(100, Math.max(18, ageRef.current + delta));
-      ageRef.current = n;
-      setAge(n);
-    }, 110);
-  }, [stopPress]);
-
-  // Sync ageRef when age changes from outside
-  useEffect(() => { ageRef.current = age; }, [age]);
-  // Cleanup on unmount
-  useEffect(() => () => stopPress(), [stopPress]);
 
   useEffect(() => { setAnim('in'); }, [idx]);
 
@@ -68,9 +28,6 @@ export const QuizScreen: React.FC<Props> = ({ questions, language, onComplete, t
 
   const canGoNext = (() => {
     if (!slide) return false;
-    if (slide.kind === 'age') return age >= 18 && age <= 100;
-    if (slide.kind === 'gender') return !!demo.gender;
-    if (slide.kind === 'interested') return !!demo.interestedIn;
     const q = questions[slide.qIndex];
     return q ? answers[q.id] !== undefined : false;
   })();
@@ -79,20 +36,12 @@ export const QuizScreen: React.FC<Props> = ({ questions, language, onComplete, t
     if (dir === 'next' && !canGoNext) return;
     if (dir === 'prev' && idx === 0) return;
 
-    if (slide?.kind === 'age') setDemo(p => ({ ...p, age: String(age) }));
-
     if (dir === 'next' && isLast) {
-      const finalDemo = slide?.kind === 'age' ? { ...demo, age: String(age) } : demo;
-      onComplete(finalDemo, Object.entries(answers).map(([id, v]) => ({ questionId: +id, value: v })));
+      onComplete(Object.entries(answers).map(([id, v]) => ({ questionId: +id, value: v })));
       return;
     }
     setAnim(dir === 'next' ? 'left' : 'right');
     setTimeout(() => setIdx(i => i + (dir === 'next' ? 1 : -1)), 170);
-  };
-
-  const pickDemo = (field: 'gender' | 'interestedIn', val: string) => {
-    setDemo(p => ({ ...p, [field]: val }));
-    setTimeout(() => { setAnim('left'); setTimeout(() => setIdx(i => i + 1), 170); }, 280);
   };
 
   const pickAnswer = (qId: number, val: number) => {
@@ -102,7 +51,7 @@ export const QuizScreen: React.FC<Props> = ({ questions, language, onComplete, t
       setTimeout(() => {
         if (isLast) {
           const nextAnswers = { ...answers, [qId]: val };
-          onComplete(demo, Object.entries(nextAnswers).map(([id, v]) => ({ questionId: +id, value: v })));
+          onComplete(Object.entries(nextAnswers).map(([id, v]) => ({ questionId: +id, value: v })));
         } else {
           setAnim('left');
           setTimeout(() => setIdx(i => i + 1), 170);
@@ -118,74 +67,6 @@ export const QuizScreen: React.FC<Props> = ({ questions, language, onComplete, t
   /* ── Slide renderer ── */
   const renderSlide = () => {
     if (!slide) return null;
-
-    /* Age */
-    if (slide.kind === 'age') return (
-      <div className="text-center w-full select-none">
-        <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-indigo-300/60 mb-10">{dt.ageLabel}</p>
-        <div className="flex items-center justify-center gap-5">
-          {/* − */}
-          <button
-            className="liquid-glass-btn w-14 h-14 rounded-full text-white/70 text-2xl font-light flex items-center justify-center"
-            onMouseDown={() => startPress(-1)} onMouseUp={stopPress} onMouseLeave={stopPress}
-            onTouchStart={(e) => { e.preventDefault(); startPress(-1); }} onTouchEnd={stopPress}
-          >−</button>
-
-          {/* Number display */}
-          <div className="liquid-glass w-32 h-20 flex items-center justify-center rounded-3xl">
-            <span className="text-5xl font-light text-white tabular-nums leading-none">{age}</span>
-          </div>
-
-          {/* + */}
-          <button
-            className="liquid-glass-btn w-14 h-14 rounded-full text-white/70 text-2xl font-light flex items-center justify-center"
-            onMouseDown={() => startPress(1)} onMouseUp={stopPress} onMouseLeave={stopPress}
-            onTouchStart={(e) => { e.preventDefault(); startPress(1); }} onTouchEnd={stopPress}
-          >+</button>
-        </div>
-        <p className="text-xs text-white/20 mt-5 tracking-widest">18 — 100</p>
-      </div>
-    );
-
-    /* Gender */
-    if (slide.kind === 'gender') return (
-      <div className="text-center w-full">
-        <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-indigo-300/60 mb-10">{dt.genderLabel}</p>
-        <div className="flex flex-wrap justify-center gap-3">
-          {(['male', 'female', 'non-binary'] as const).map((val, i) => {
-            const labels = [dt.genderOptions.male, dt.genderOptions.female, dt.genderOptions.nonbinary];
-            const sel = demo.gender === val;
-            return (
-              <button key={val} onClick={() => pickDemo('gender', val)}
-                className={`px-7 py-3.5 rounded-2xl text-sm font-medium transition-all duration-200
-                  ${sel ? 'liquid-glass-primary scale-105' : 'liquid-glass-btn text-white/75'}`}>
-                {labels[i]}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    );
-
-    /* Interested in */
-    if (slide.kind === 'interested') return (
-      <div className="text-center w-full">
-        <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-indigo-300/60 mb-10">{dt.interestedLabel}</p>
-        <div className="flex flex-wrap justify-center gap-3">
-          {(['everyone', 'men', 'women'] as const).map((val, i) => {
-            const labels = [dt.interestedOptions.everyone, dt.interestedOptions.men, dt.interestedOptions.women];
-            const sel = demo.interestedIn === val;
-            return (
-              <button key={val} onClick={() => pickDemo('interestedIn', val)}
-                className={`px-7 py-3.5 rounded-2xl text-sm font-medium transition-all duration-200
-                  ${sel ? 'liquid-glass-primary scale-105' : 'liquid-glass-btn text-white/75'}`}>
-                {labels[i]}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    );
 
     /* Question */
     const q = questions[slide.qIndex];
