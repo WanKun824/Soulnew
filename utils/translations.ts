@@ -76,7 +76,10 @@ export const translations = {
       placeholder: "ENTER SOUL ID",
       submit: "Summon",
       notFound: "Soul not found in the archives.",
-      back: "Return"
+      back: "Return",
+      soulPortrait: "Soul Portrait",
+      activateBtn: "Set as Active",
+      activeTag: "CURRENTLY ACTIVE"
     },
     settings: {
       title: "USER SETTINGS",
@@ -178,7 +181,10 @@ export const translations = {
       placeholder: "输入 Soul ID",
       submit: "唤醒",
       notFound: "未在虚空中找到该档案。",
-      back: "返回"
+      back: "返回",
+      soulPortrait: "灵魂画像",
+      activateBtn: "设为当前匹配档案",
+      activeTag: "当前活跃"
     },
     settings: {
       title: "个人资料",

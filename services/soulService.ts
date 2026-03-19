@@ -440,3 +440,42 @@ export const analyzeProfile = async (
 
   return profile;
 };
+
+export const activateQuizAttempt = async (attempt: import('../types').QuizAttempt) => {
+  const user = await getCurrentUser();
+  if (!user || !attempt.analysisResult) return;
+
+  const decoded = decodeSoulId(attempt.soulId);
+  if (!decoded) return;
+
+  const { Dimension } = await import('../types');
+  const profile = attempt.analysisResult;
+  const scores = profile.scores;
+  
+  const scoreVector = [
+    scores.find(s => s.dimension === Dimension.WEALTH)?.score ?? 0,
+    scores.find(s => s.dimension === Dimension.FAMILY)?.score ?? 0,
+    scores.find(s => s.dimension === Dimension.LIFESTYLE)?.score ?? 0,
+    scores.find(s => s.dimension === Dimension.COMMUNICATION)?.score ?? 0,
+    scores.find(s => s.dimension === Dimension.GROWTH)?.score ?? 0,
+  ];
+
+  const { error } = await supabase.from('profiles').upsert({
+    id: user.id,
+    soul_id: attempt.soulId,
+    soul_title: profile.mbtiType,
+    summary: profile.summary,
+    ideal_partner: profile.idealPartner,
+    compatibility_advice: profile.compatibilityAdvice,
+    radar_scores: scoreVector,
+    age: parseInt(decoded.demographics.age),
+    gender: decoded.demographics.gender,
+    interested_in: decoded.demographics.interestedIn,
+    updated_at: new Date().toISOString()
+  }, { onConflict: 'id' });
+
+  if (error) {
+    console.error('activateQuizAttempt: Sync error', error);
+    throw error;
+  }
+};

@@ -165,36 +165,44 @@ export default function App() {
     };
   }, []);
 
+  const refreshUserProfile = async (userId: string) => {
+    console.log('App: Fetching demographics for', userId);
+    const { data, error } = await supabase.from('profiles').select('age, gender, interested_in, radar_scores').eq('id', userId).single();
+    
+    if (data && !error) {
+      console.log('App: Received demographics from DB', data);
+      const demo = {
+        age: String(data.age),
+        gender: data.gender,
+        interestedIn: data.interested_in,
+      };
+      setDemographics(demo);
+      localStorage.setItem('soul_demographics', JSON.stringify(demo));
+      
+      if (data.radar_scores) {
+        const raw = data.radar_scores;
+        const parsed = Array.isArray(raw) 
+          ? raw 
+          : (typeof raw === 'string' 
+             ? raw.replace(/[\[\]]/g, '').split(',').map(Number)
+             : [0,0,0,0,0]);
+        setCurrentUserScores(parsed);
+      }
+      return true;
+    } else {
+      console.log('App: No demographics in DB or error', error);
+      return false;
+    }
+  };
+
   // Fetch demographics from Supabase when user logs in
   useEffect(() => {
     if (sessionUser) {
-      console.log('App: Fetching demographics for', sessionUser.id);
-      supabase.from('profiles').select('age, gender, interested_in, radar_scores').eq('id', sessionUser.id).single()
-        .then(({ data, error }) => {
-          if (data && !error) {
-            console.log('App: Received demographics from DB', data);
-            const demo = {
-              age: String(data.age),
-              gender: data.gender,
-              interestedIn: data.interested_in,
-            };
-            setDemographics(demo);
-            localStorage.setItem('soul_demographics', JSON.stringify(demo));
-            if (data.radar_scores) {
-              const raw = data.radar_scores;
-              const parsed = Array.isArray(raw) 
-                ? raw 
-                : (typeof raw === 'string' 
-                   ? raw.replace(/[\[\]]/g, '').split(',').map(Number)
-                   : [0,0,0,0,0]);
-              setCurrentUserScores(parsed);
-            }
-            } else {
-              console.log('App: No demographics in DB or error', error);
-              // Auto-prompt profile setup if missing
-              setShowSettingsModal(true);
-            }
-        });
+      refreshUserProfile(sessionUser.id).then(hasProfile => {
+        if (!hasProfile) {
+          setShowSettingsModal(true);
+        }
+      });
     }
   }, [sessionUser]);
 
@@ -458,6 +466,13 @@ export default function App() {
                   onProfileFound={(p) => { setProfile(p); setStep(AppStep.RESULTS); }} 
                   onRetry={handleRetryAttempt}
                   userId={sessionUser?.id}
+                  currentSoulId={profile?.soulId}
+                  onProfileActivated={() => {
+                    if (sessionUser) {
+                      refreshUserProfile(sessionUser.id);
+                      showToast('灵魂档案已激活，匹配已更新', 'success');
+                    }
+                  }}
                   text={t.lookup} 
                 />
               </React.Suspense>
