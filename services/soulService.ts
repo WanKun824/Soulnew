@@ -8,7 +8,7 @@ import { supabase } from "./supabase";
 import { getCurrentUser } from "./auth";
 
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-const MODEL = 'gemini-2.5-flash'; // Reverted to a more stable model name
+const MODEL = 'gemini-3.1-flash-lite-preview'; // Updated to latest lite preview model
 
 // ============================================================
 // SEEDED PRNG (Mulberry32) & SHUFFLE
