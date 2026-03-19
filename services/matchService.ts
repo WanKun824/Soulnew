@@ -65,14 +65,36 @@ export const swipe = async (targetUserId: string, direction: 'like' | 'dislike')
   }
 
   if (direction === 'like') {
-    // Check if it's a mutual match
-    const { data: match } = await supabase
-      .from('matches')
+    // 1. Check if the other person already liked us
+    const { data: theirSwipe } = await supabase
+      .from('swipes')
       .select('id')
-      .or(`and(user1_id.eq.${user.id},user2_id.eq.${targetUserId}),and(user1_id.eq.${targetUserId},user2_id.eq.${user.id})`)
+      .eq('swiper_id', targetUserId)
+      .eq('receiver_id', user.id)
+      .eq('direction', 'like')
       .maybeSingle();
-    
-    return !!match;
+
+    if (theirSwipe) {
+      // It's a mutual match!
+      // 2. Check if a match record already exists
+      const { data: existingMatch } = await supabase
+        .from('matches')
+        .select('id')
+        .or(`and(user1_id.eq.${user.id},user2_id.eq.${targetUserId}),and(user1_id.eq.${targetUserId},user2_id.eq.${user.id})`)
+        .maybeSingle();
+      
+      if (!existingMatch) {
+        // 3. Create the match record explicitly if it wasn't handled by a DB trigger
+        const user1_id = user.id < targetUserId ? user.id : targetUserId;
+        const user2_id = user.id < targetUserId ? targetUserId : user.id;
+        
+        await supabase.from('matches').insert({
+          user1_id,
+          user2_id
+        });
+      }
+      return true;
+    }
   }
 
   return false;

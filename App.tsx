@@ -523,6 +523,7 @@ export default function App() {
                 onGoToInbox={() => setStep(AppStep.INBOX)}
                 onMatch={(p) => {
                   showToast(` 与 ${p.soulTitle} 建立连接！`, 'success');
+                  setStep(AppStep.INBOX);
                 }}
               />
             </React.Suspense>
